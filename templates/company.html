@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ company.name }} — Eco Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<header class="nav">
+  <a class="brand" href="/"><span class="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 22C7 11 17 5 26 6c0 10-5 19-16 19M8 26c4-7 9-11 16-16"/></svg></span><span>ECO<span class="brand-light">INDEX</span></span></a>
+  <nav><a href="/">Explore</a><a href="/compare">Compare</a><a href="/">Search</a></nav><a class="nav-cta" href="/">Explore data <span>↗</span></a>
+</header>
+<main class="dashboard">
+  <div class="crumb"><a href="/">Companies</a> / {{ company.name }}</div>
+  <section class="company-hero">
+    <div>
+      <div class="eyebrow">{{ company.industry }} · {{ company.country }}</div>
+      <h1>{{ company.name }}</h1>
+      <p>{{ company.description }}</p>
+      <div class="source-pill">● Data source: {{ company.source_name }} · {{ company.reporting_year }}</div>
+    </div>
+    <div class="score-card">
+      <div class="score">{{ company.score.total }}</div><div class="score-label">ECO INDEX <small>/100</small></div>
+      <div class="confidence">DATA CONFIDENCE · HIGH*</div>
+    </div>
+  </section>
+
+  <section class="dashboard-grid">
+    <div class="panel carbon">
+      <div class="panel-top"><div><div class="eyebrow">CARBON FOOTPRINT</div><h2>{{ "{:,.2f}".format(company.total_emissions/1000000) }}M <small>tCO₂e</small></h2></div><span class="tag">FY{{ company.reporting_year }}</span></div>
+      <div class="scope-visual"><div class="scope-chart-wrap"><canvas id="scopeChart" aria-label="Emissions by scope"></canvas></div><div class="scope-list">
+        <div><span>Scope 1</span><b>{{ "{:,.0f}".format(company.scope1) }}</b><i style="width: {{ (company.scope1/company.total_emissions*100)|round(1) }}%"></i></div>
+        <div><span>Scope 2</span><b>{{ "{:,.0f}".format(company.scope2) }}</b><i style="width: {{ (company.scope2/company.total_emissions*100)|round(1) }}%"></i></div>
+        <div><span>Scope 3</span><b>{{ "{:,.0f}".format(company.scope3) }}</b><i style="width: {{ (company.scope3/company.total_emissions*100)|round(1) }}%"></i></div>
+      </div></div>
+    </div>
+
+    <div class="panel trend">
+      <div class="eyebrow">EMISSIONS TREND</div><h3>Reported / modeled view</h3>
+      <canvas id="trendChart"></canvas>
+    </div>
+  </section>
+
+  <section class="dashboard-grid lower">
+    <div class="panel">
+      <div class="eyebrow">SUSTAINABILITY INDICATORS</div>
+      <div class="metrics">
+        <div><b>{{ company.renewable_energy_pct }}%</b><span>Renewable energy</span></div>
+        <div><b>{{ company.waste_recycled_pct }}%</b><span>Waste recycled</span></div>
+        <div><b>{{ company.emission_change_pct }}%</b><span>YoY emissions</span></div>
+        <div><b>{{ company.revenue_billion }}</b><span>Revenue, $B*</span></div>
+      </div>
+    </div>
+
+    <div class="panel score-breakdown">
+      <div class="eyebrow">WHY THIS SCORE?</div>
+      {% for label,key,maxval in [('Carbon footprint','carbon',40),('Emission reduction','reduction',20),('Renewable energy','renewable',15),('Waste management','waste',10),('Water efficiency','water',5),('Transparency','transparency',10)] %}
+      <div class="score-row"><span>{{ label }}</span><b>{{ company.score[key] }}/{{ maxval }}</b><div><i style="width: {{ (company.score[key]/maxval*100)|round(1) }}%"></i></div></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="source-box">
+    <div><div class="eyebrow">SOURCE & LIMITATIONS</div><h3>{{ company.source_name }}</h3><p>Reported year: {{ company.reporting_year }} · Values are displayed in tCO₂e where applicable.</p></div>
+    <a class="button" target="_blank" href="{{ company.source_url }}">View source ↗</a>
+  </section>
+
+  <div class="actions"><a class="button primary" href="/compare">Compare companies</a><a class="button" href="/">Search another company</a></div>
+  <p class="footnote">* Demo implementation. Historical trend values are illustrative in this prototype; replace them with year-by-year reported figures before production use.</p>
+</main>
+<footer><a class="brand" href="/"><span class="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 22C7 11 17 5 26 6c0 10-5 19-16 19M8 26c4-7 9-11 16-16"/></svg></span><span>ECO<span class="brand-light">INDEX</span></span></a><span>NOT AN OFFICIAL ENVIRONMENTAL CERTIFICATION</span><span>© 2026 · PROTOTYPE</span></footer>
+<script>
+const trend = {{ company.trend|tojson }};
+Chart.defaults.color = '#819b9c';
+Chart.defaults.font.family = 'DM Sans, sans-serif';
+const chartColors = ['#8df0bd','#38c9ad','#70d5f0'];
+new Chart(document.getElementById('trendChart'), {
+  type:'line',
+  data:{labels:trend.map(x=>x.year),datasets:[{label:'Emissions',data:trend.map(x=>x.value/1000000),tension:.38,fill:true,borderColor:'#8df0bd',backgroundColor:'rgba(56,201,173,.12)',pointBackgroundColor:'#8df0bd',pointBorderColor:'#0d2932',pointRadius:3,pointHoverRadius:5,borderWidth:2}]},
+  options:{responsive:true,maintainAspectRatio:true,interaction:{intersect:false,mode:'index'},plugins:{legend:{display:false},tooltip:{backgroundColor:'#071a22',borderColor:'rgba(141,240,189,.25)',borderWidth:1,padding:12,displayColors:false,callbacks:{label:ctx=>ctx.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2})+' million tCO₂e'}}},scales:{x:{grid:{display:false},border:{display:false}},y:{beginAtZero:false,grid:{color:'rgba(182,220,214,.09)'},border:{display:false},ticks:{maxTicksLimit:5},title:{display:true,text:'Million tCO₂e',color:'#819b9c',font:{size:10}}}}}
+});
+new Chart(document.getElementById('scopeChart'), {type:'doughnut',data:{labels:['Scope 1','Scope 2','Scope 3'],datasets:[{data:[{{ company.scope1 }},{{ company.scope2 }},{{ company.scope3 }}],backgroundColor:chartColors,borderColor:'#0d2932',borderWidth:4,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#071a22',borderColor:'rgba(141,240,189,.25)',borderWidth:1,padding:10,callbacks:{label:ctx=>ctx.label+': '+ctx.parsed.toLocaleString()+' tCO₂e'}}}}});
+</script>
+</body>
+</html>

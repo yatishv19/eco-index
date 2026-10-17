@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comparison Studio — Eco Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<header class="nav"><a class="brand" href="/"><span class="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 22C7 11 17 5 26 6c0 10-5 19-16 19M8 26c4-7 9-11 16-16"/></svg></span><span>ECO<span class="brand-light">INDEX</span></span></a><nav><a href="/">Explore</a><a class="active" href="/compare">Compare</a><a href="/">Search</a></nav><a class="nav-cta" href="/">Explore data <span>↗</span></a></header>
+<main class="dashboard compare-studio">
+  <div class="eyebrow"><span class="live-dot"></span> 03 — COMPARISON STUDIO</div>
+  <h1>Compare the <span class="gradient-text">full picture.</span></h1>
+  <p class="lede">Choose 2–4 companies, switch metrics, inspect emissions by scope, and compare sustainability indicators side by side.</p>
+
+  <section class="compare-picker panel">
+    <div class="picker-heading"><div><div class="eyebrow">01 / SELECT COMPANIES</div><h2>Your comparison set</h2></div><span class="selection-count" id="selectionCount">2 of 4 selected</span></div>
+    <div class="company-picker" id="companyPicker">
+    {% for c in companies %}
+      <label class="company-choice" data-company-id="{{ c.id }}">
+        <input type="checkbox" value="{{ c.id }}" {% if loop.index <= 2 %}checked{% endif %}>
+        <span class="choice-check"></span><span class="brand-logo-wrap"><img class="brand-logo" alt="{{ c.name }} logo" data-company="{{ c.name }}" data-website="{{ c.website }}" loading="lazy"><span class="logo-fallback">{{ c.name[:1] }}</span></span>
+        <span class="choice-copy"><b>{{ c.name }}</b><small>{{ c.industry }} · {{ c.country }}</small></span><span class="choice-arrow">↗</span>
+      </label>
+    {% endfor %}
+    </div>
+    <p class="picker-hint">Select between 2 and 4 companies. Company marks load from brand icon assets when available; a monogram is used if an asset fails to load.</p>
+  </section>
+
+  <section class="compare-summary" id="compareSummary" aria-live="polite"></section>
+
+  <section class="compare-chart-grid">
+    <div class="panel chart-panel chart-main-panel">
+      <div class="chart-panel-head"><div><div class="eyebrow">02 / METRIC COMPARISON</div><h2>Performance at a glance</h2><p>Hover or tap a bar to inspect the value.</p></div>
+        <label class="metric-control"><span>COMPARE BY</span><select id="metricSelect"><option value="total_emissions">Total emissions</option><option value="scope1">Scope 1 emissions</option><option value="scope2">Scope 2 emissions</option><option value="scope3">Scope 3 emissions</option><option value="score">Eco Index score</option><option value="renewable_energy_pct">Renewable energy</option><option value="waste_recycled_pct">Waste recycled</option><option value="emission_change_pct">YoY emissions change</option></select></label>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="metricChart" aria-label="Interactive selected metric comparison chart"></canvas></div>
+      <div class="chart-footnote" id="metricExplanation">Lower total emissions can indicate a smaller footprint, but company size and industry affect comparability.</div>
+    </div>
+    <div class="panel chart-panel">
+      <div class="eyebrow">03 / EMISSIONS MIX</div><h2>Where emissions come from</h2><p class="panel-subtitle">Scope 1, 2 and 3 shown as shares of each company's reported total.</p>
+      <div class="chart-canvas-wrap scope-compare-wrap"><canvas id="scopeCompareChart" aria-label="Interactive emissions scope composition chart"></canvas></div>
+      <div class="scope-legend"><span><i class="legend-s1"></i>Scope 1</span><span><i class="legend-s2"></i>Scope 2</span><span><i class="legend-s3"></i>Scope 3</span></div>
+    </div>
+    <div class="panel chart-panel chart-wide">
+      <div class="chart-panel-head"><div><div class="eyebrow">04 / SUSTAINABILITY INDICATORS</div><h2>Beyond carbon</h2><p>Compare energy, circularity and Eco Index score on a common 0–100 scale.</p></div>
+        <label class="metric-control"><span>INDICATOR</span><select id="indicatorSelect"><option value="score">Eco Index score</option><option value="renewable_energy_pct">Renewable energy</option><option value="waste_recycled_pct">Waste recycled</option></select></label>
+      </div>
+      <div class="chart-canvas-wrap indicator-wrap"><canvas id="indicatorChart" aria-label="Interactive sustainability indicator comparison"></canvas></div>
+    </div>
+  </section>
+
+  <section class="panel data-table-panel">
+    <div class="table-title"><div><div class="eyebrow">05 / EXACT VALUES</div><h2>Numbers behind the charts</h2></div><span class="table-hint">Values are shown with units</span></div>
+    <div class="comparison-table-scroll"><table class="comparison-data-table"><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
+  </section>
+  <div class="compare-note"><b>Read this before comparing:</b> this prototype contains illustrative demonstration values, not a verified live company dataset. Company reporting boundaries, years, revenue and industry differ. Eco Index scores are experimental, and should not be treated as official ratings or investment advice.</div>
+</main>
+<footer><a class="brand" href="/"><span class="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 22C7 11 17 5 26 6c0 10-5 19-16 19M8 26c4-7 9-11 16-16"/></svg></span><span>ECO<span class="brand-light">INDEX</span></span></a><span>ENVIRONMENTAL INTELLIGENCE FOR EVERYDAY DECISIONS</span><span>© 2026 · PROTOTYPE</span></footer>
+<script>
+const companies = {{ companies|tojson }};
+const palette = ['#8df0bd','#70d5f0','#f4c36a','#c6a5ff'];
+const metrics = {
+ total_emissions:{label:'Total emissions',unit:' tCO₂e',format:'number',explain:'Lower total emissions can indicate a smaller footprint, but company size and industry affect comparability.'},
+ scope1:{label:'Scope 1 emissions',unit:' tCO₂e',format:'number',explain:'Scope 1 covers direct emissions from sources owned or controlled by a company.'},
+ scope2:{label:'Scope 2 emissions',unit:' tCO₂e',format:'number',explain:'Scope 2 covers emissions associated with purchased electricity, steam, heating and cooling.'},
+ scope3:{label:'Scope 3 emissions',unit:' tCO₂e',format:'number',explain:'Scope 3 covers other value-chain emissions and may dominate some industries.'},
+ score:{label:'Eco Index score',unit:'/100',format:'score',explain:'Prototype score based on experimental weights; it is not an official environmental certification.'},
+ renewable_energy_pct:{label:'Renewable energy',unit:'%',format:'percent',explain:'Renewable energy share as represented in the demonstration dataset.'},
+ waste_recycled_pct:{label:'Waste recycled',unit:'%',format:'percent',explain:'Waste recycling share as represented in the demonstration dataset.'},
+ emission_change_pct:{label:'YoY emissions change',unit:'%',format:'percent',explain:'Negative values indicate a reported or demo decrease; positive values indicate an increase.'}
+};
+const chosen = new Set(['{{ companies[0].id if companies|length > 0 else "" }}','{{ companies[1].id if companies|length > 1 else "" }}']);
+const picker = document.getElementById('companyPicker');
+const selectedCompanies = () => companies.filter(c => chosen.has(String(c.id)));
+function fmt(v, digits=1){return Number(v).toLocaleString(undefined,{maximumFractionDigits:digits});}
+function metricValue(c,key){return key==='score'?c.score.total:Number(c[key]||0);}
+function metricDisplay(c,key){const m=metrics[key],v=metricValue(c,key);return (m.format==='number'?fmt(v,0):fmt(v,1))+m.unit;}
+function logoInit(){
+ document.querySelectorAll('.brand-logo').forEach(img=>{
+   const name=img.dataset.company;
+   const simpleSlug={'Google':'google','H&M':'hm','Coca-Cola':'cocacola','Tata Motors':'tatamotors','Reliance Industries':'relianceindustries','Nestlé':'nestle','Volkswagen':'volkswagen','Infosys':'infosys','Microsoft':'microsoft','Apple':'apple','Nike':'nike','Adidas':'adidas','Tesla':'tesla','Toyota':'toyota','PepsiCo':'pepsico'}[name];
+   const domain=(img.dataset.website||'').replace(/^https?:\/\//,'').split('/')[0];
+   const candidates=[];
+   if(simpleSlug)candidates.push('https://cdn.simpleicons.org/'+simpleSlug);
+   if(domain)candidates.push('https://www.google.com/s2/favicons?domain='+encodeURIComponent(domain)+'&sz=128');
+   let i=0;
+   const tryNext=()=>{if(i>=candidates.length){img.style.display='none';img.nextElementSibling.style.display='block';return;}img.onerror=()=>{i++;tryNext();};img.onload=()=>{img.style.display='block';img.nextElementSibling.style.display='none';};img.src=candidates[i++];};
+   tryNext();
+ });
+}
+function updateSelectionUI(){
+ document.querySelectorAll('.company-choice').forEach(label=>{
+   const input=label.querySelector('input');input.checked=chosen.has(String(input.value));
+   label.classList.toggle('selected',input.checked);label.classList.toggle('disabled-choice',!input.checked&&chosen.size>=4);
+ });
+ document.getElementById('selectionCount').textContent=chosen.size+' of 4 selected';
+}
+picker.addEventListener('change',e=>{
+ if(!e.target.matches('input[type=checkbox]'))return;
+ const id=String(e.target.value);
+ if(e.target.checked){if(chosen.size>=4){e.target.checked=false;return;}chosen.add(id);}
+ else {if(chosen.size<=2){e.target.checked=true;return;}chosen.delete(id);}
+ updateSelectionUI();renderAll();
+});
+function summaryRender(){
+ const selected=selectedCompanies();
+ document.getElementById('compareSummary').innerHTML=selected.map((c,i)=>`<article class="compare-company-summary"><div class="summary-top"><span class="summary-logo"><img class="summary-img" data-summary-id="${c.id}" alt="" src=""></span><span class="summary-rank">0${i+1}</span></div><div class="summary-name">${c.name}</div><div class="summary-industry">${c.industry} · ${c.country}</div><div class="summary-score-row"><span>Eco Index</span><strong>${c.score.total}<small>/100</small></strong></div><div class="summary-meter"><i style="width:${Math.max(0,Math.min(100,c.score.total))}%;background:${palette[i]}"></i></div><div class="summary-emissions"><span>Total emissions</span><b>${fmt(c.total_emissions,0)} tCO₂e</b></div></article>`).join('');
+ const logoMap={Apple:'apple',Microsoft:'microsoft',Google:'google',Nike:'nike',Adidas:'adidas','H&M':'hm',Tesla:'tesla',Toyota:'toyota',Volkswagen:'volkswagen','Coca-Cola':'cocacola',PepsiCo:'pepsico','Nestlé':'nestle','Tata Motors':'tatamotors','Reliance Industries':'relianceindustries',Infosys:'infosys'};
+ document.querySelectorAll('.summary-img').forEach(img=>{const c=companies.find(x=>String(x.id)===img.dataset.summaryId);const domain=(c.website||'').replace(/^https?:\/\//,'').split('/')[0];const slug=logoMap[c.name];img.onerror=()=>{img.onerror=null;img.src='https://www.google.com/s2/favicons?domain='+encodeURIComponent(domain)+'&sz=128';};img.onload=()=>{img.style.opacity='1';};img.src=slug?'https://cdn.simpleicons.org/'+slug:'https://www.google.com/s2/favicons?domain='+encodeURIComponent(domain)+'&sz=128';});
+}
+Chart.defaults.color='#91a9aa';Chart.defaults.font.family='DM Sans, sans-serif';Chart.defaults.borderColor='rgba(182,220,214,.1)';
+const baseOpts={responsive:true,maintainAspectRatio:false,animation:{duration:450},interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#071a22',borderColor:'rgba(141,240,189,.3)',borderWidth:1,padding:12,titleColor:'#edf6f2',bodyColor:'#d4e5df'}}};
+let metricChart,scopeChart,indicatorChart;
+function makeMetricChart(){
+ const key=document.getElementById('metricSelect').value,m=metrics[key],selected=selectedCompanies();
+ if(metricChart)metricChart.destroy();
+ metricChart=new Chart(document.getElementById('metricChart'),{type:'bar',data:{labels:selected.map(c=>c.name),datasets:[{label:m.label,data:selected.map(c=>metricValue(c,key)),backgroundColor:selected.map((c,i)=>palette[i]+'CC'),borderColor:selected.map((c,i)=>palette[i]),borderWidth:1,borderRadius:7,maxBarThickness:42}]},options:{...baseOpts,indexAxis:'y',scales:{x:{beginAtZero:key!=='emission_change_pct',grid:{color:'rgba(182,220,214,.08)'},ticks:{callback:v=>m.format==='number'?Number(v).toLocaleString():v+(m.format==='percent'?'%':'')}},y:{grid:{display:false}}},plugins:{...baseOpts.plugins,tooltip:{...baseOpts.plugins.tooltip,callbacks:{label:ctx=>m.label+': '+metricDisplay(selected[ctx.dataIndex],key)}}}}});
+ document.getElementById('metricExplanation').textContent=m.explain;
+}
+function makeScopeChart(){
+ const selected=selectedCompanies();if(scopeChart)scopeChart.destroy();
+ scopeChart=new Chart(document.getElementById('scopeCompareChart'),{type:'bar',data:{labels:selected.map(c=>c.name),datasets:[{label:'Scope 1',data:selected.map(c=>c.total_emissions?c.scope1/c.total_emissions*100:0),backgroundColor:'#8df0bd',borderRadius:3},{label:'Scope 2',data:selected.map(c=>c.total_emissions?c.scope2/c.total_emissions*100:0),backgroundColor:'#70d5f0',borderRadius:3},{label:'Scope 3',data:selected.map(c=>c.total_emissions?c.scope3/c.total_emissions*100:0),backgroundColor:'#c6a5ff',borderRadius:3}]},options:{...baseOpts,indexAxis:'y',scales:{x:{stacked:true,max:100,grid:{color:'rgba(182,220,214,.08)'},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}},plugins:{...baseOpts.plugins,legend:{display:false},tooltip:{...baseOpts.plugins.tooltip,callbacks:{label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.x,1)+'% of total'}}}}});
+}
+function makeIndicatorChart(){
+ const key=document.getElementById('indicatorSelect').value,selected=selectedCompanies();if(indicatorChart)indicatorChart.destroy();
+ indicatorChart=new Chart(document.getElementById('indicatorChart'),{type:'bar',data:{labels:selected.map(c=>c.name),datasets:[{label:metrics[key].label,data:selected.map(c=>metricValue(c,key)),backgroundColor:selected.map((c,i)=>palette[i]+'CC'),borderColor:selected.map((c,i)=>palette[i]),borderWidth:1,borderRadius:7,maxBarThickness:45}]},options:{...baseOpts,scales:{x:{grid:{display:false}},y:{beginAtZero:true,max:100,grid:{color:'rgba(182,220,214,.08)'},ticks:{callback:v=>v+' points'}}},plugins:{...baseOpts.plugins,tooltip:{...baseOpts.plugins.tooltip,callbacks:{label:ctx=>metrics[key].label+': '+fmt(ctx.parsed.y,1)+(key==='score'?' /100':'%')}}}}});
+}
+function renderTable(){
+ const selected=selectedCompanies();
+ const rows=[['Eco Index score',c=>c.score.total,'/100'],['Total emissions',c=>c.total_emissions,' tCO₂e'],['Scope 1',c=>c.scope1,' tCO₂e'],['Scope 2',c=>c.scope2,' tCO₂e'],['Scope 3',c=>c.scope3,' tCO₂e'],['Renewable energy',c=>c.renewable_energy_pct,'%'],['Waste recycled',c=>c.waste_recycled_pct,'%'],['YoY emissions change',c=>c.emission_change_pct,'%'],['Reporting year',c=>c.reporting_year,'']];
+ document.getElementById('tableHead').innerHTML='<tr><th>Metric</th>'+selected.map((c,i)=>`<th><span class="table-company"><span class="table-dot" style="background:${palette[i]}"></span>${c.name}</span></th>`).join('')+'</tr>';
+ document.getElementById('tableBody').innerHTML=rows.map(([label,get,unit])=>`<tr><th>${label}</th>${selected.map(c=>`<td>${fmt(get(c),label.includes('emissions')?0:1)}${unit}</td>`).join('')}</tr>`).join('');
+}
+function renderAll(){summaryRender();makeMetricChart();makeScopeChart();makeIndicatorChart();renderTable();}
+document.getElementById('metricSelect').addEventListener('change',makeMetricChart);
+document.getElementById('indicatorSelect').addEventListener('change',makeIndicatorChart);
+logoInit();updateSelectionUI();renderAll();
+</script>
+</body></html>
